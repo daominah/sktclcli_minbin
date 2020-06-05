@@ -2,17 +2,16 @@ import json
 from threading import Timer
 import websocket
 import logging
-import importlib
 
-Emitter = importlib.import_module(".Emitter", package="socketclusterclient")
-Parser = importlib.import_module(".Parser", package="socketclusterclient")
+from .Emitter import emitter
+from .Parser import parse
 
 sclogger = logging.getLogger(__name__)
 sclogger.addHandler(logging.StreamHandler())
 sclogger.setLevel(logging.WARNING)
 
 
-class socket(Emitter.emitter):
+class socket(emitter):
     def enablelogger(self, enabled):
         if (enabled):
             sclogger.setLevel(logging.DEBUG)
@@ -135,7 +134,7 @@ class socket(Emitter.emitter):
             rid = mainobject["rid"]
             cid = mainobject["cid"]
             event = mainobject["event"]
-            result = Parser.parse(dataobject, rid, cid, event)
+            result = parse(dataobject, rid, cid, event)
             if result == 1:
                 self.subscribechannels()
                 if self.OnAuthentication is not None:
@@ -215,7 +214,7 @@ class socket(Emitter.emitter):
         self.enablereconnection = False
         self.delay = 3
         self.ws = self.onConnected = self.onDisconnected = self.onConnectError = self.onSetAuthentication = self.OnAuthentication = None
-        Emitter.emitter.__init__(self)
+        emitter.__init__(self)
 
     def connect(self, sslopt=None, http_proxy_host=None, http_proxy_port=None):
         self.ws = websocket.WebSocketApp(self.url,
