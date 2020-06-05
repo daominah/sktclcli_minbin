@@ -1,5 +1,6 @@
 gevent==20.5.2
 greenlet==0.4.15
+msgpack==1.0.0
 six==1.15.0
 websocket==0.2.1
 websocket-client==0.39.0

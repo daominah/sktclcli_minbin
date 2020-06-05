@@ -40,4 +40,7 @@ if __name__ == "__main__":
     s = socket(svrAddr)
     s.setBasicListener(on_connect, on_disconnect, on_connect_error)
     s.onchannel(channel0, on_message)
+
+    s.enablelogger(True)
+
     s.connect()
