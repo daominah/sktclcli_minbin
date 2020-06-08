@@ -3,9 +3,12 @@ import setuptools
 with open("readme.md", "r") as fh:
     long_description = fh.read()
 
+with open('requirements.txt') as f:
+    requirements = f.read().splitlines()
+
 setuptools.setup(
     name="sktclcli_minbin",  # add your username to ensure uniqueness
-    version="0.1.0",
+    version="0.1.1",
     author="daominah",
     author_email="tung.dao@techx.vn",
     description="A client in Python to connect to socket cluster server",
@@ -19,4 +22,5 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
+    install_requires=requirements
 )

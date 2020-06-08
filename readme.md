@@ -15,11 +15,13 @@ Example for publishing and subscribing data in `main_test.py`
 ### Commands for devs
 * Ubuntu common python packages:  
 ````apt install -qy python3-dev python3-distutils python3-pip python3-setuptools python3-venv````
-* `venv/bin/activate`  
-* `python -m pip freeze --local > requirements.txt`
+* Create and active virtual environment:    
+`python3 -m pip venv venv && venv/bin/activate`
+* Save dependencies list:  
+`python -m pip freeze --local > requirements.txt`
 * Packaging tools:  
 ````sudo python3 -m pip install --upgrade setuptools wheel twine keyrings.alt````  
 * Create built distribution:  
-````python setup.py sdist bdist_wheel````  
+````python3 setup.py sdist bdist_wheel````  
 * Upload the distribution:  
-````/usr/bin/python3.7 -m twine upload --repository pypi ./dist/*````
+````python3 -m twine upload --repository pypi ./dist/*````
