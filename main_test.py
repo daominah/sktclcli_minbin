@@ -27,8 +27,8 @@ def on_connect_error(sock: socket, err):
     logging.warning("on_connect_error got called: %s", err)
 
 
-def on_message(key, obj):
-    logging.warning("received key %s, data:%s ", key, obj)
+def on_message(channel, obj):
+    logging.warning("received from channel %s, msg: %s ", channel, obj)
 
 
 def on_sub_ack(channel, error, obj):
@@ -41,5 +41,6 @@ if __name__ == "__main__":
     logging.warning("about to connect: %s", svrAddr)
     s = socket(svrAddr)
     s.setBasicListener(on_connect, on_disconnect, on_connect_error)
+    s.enablereconnection = True
     s.onchannel(channel0, on_message)
     s.connect()

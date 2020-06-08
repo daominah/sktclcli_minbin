@@ -21,7 +21,7 @@ class BlankDict(dict):
 
 def msgpackEncode(obj: Any):
     encoded = msgpack.packb(obj, use_bin_type=True)
-    logging.warning("encoded: %s, %s, %s", type(encoded), [b for b in encoded], encoded)
+    # logging.warning("encoded: %s, %s, %s", type(encoded), [b for b in encoded], encoded)
     return encoded
 
 
@@ -35,7 +35,7 @@ class Packer:
         self.is_enable_codec = is_enable_codec
 
     def marshal(self, v: Any) -> bytes:
-        logging.warning("marshal: %s", v)
+        # logging.warning("marshal: %s", v)
         if not self.is_enable_codec:
             return json.dumps(v, sort_keys=True)
 
@@ -105,7 +105,7 @@ class Packer:
         ret["data"] = {"channel": array[0], "data": array[1]}
         if len(array) == 3:
             ret["cid"] = array[2]
-        logging.warning("unmarshal: msg: %s, ret: %s, v: %s", msg, ret, v)
+        # logging.warning("unmarshal: msg: %s, ret: %s, v: %s", msg, ret, v)
         return ret
 
 
@@ -231,10 +231,9 @@ class socket(emitter):
             return
 
         mainobject = self.packer.unmarshal(message)
-        logging.warning("on_message mainobject: %s", mainobject)
+        # logging.warning("on_message mainobject: %s", mainobject)
         if mainobject == "#1":
             pong = self.packer.marshal("#2")
-            logging.warning("received ping %s, send %s", mainobject, pong)
             self.send(pong)
             return
 
@@ -257,9 +256,8 @@ class socket(emitter):
                 self.id = dataobject["id"]
                 self.OnAuthentication(self, dataobject["isAuthenticated"])
         elif msgType == 2:
-            logging.warning("msgType == 2: %s", dataobject)
+            # logging.warning("received msg on channel: %s", dataobject)
             self.execute(dataobject["channel"], dataobject["data"])
-            # received msg on channel
         elif msgType == 3:
             self.authToken = None
             # remove token event received
