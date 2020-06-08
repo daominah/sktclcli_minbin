@@ -1,3 +1,5 @@
+import logging
+
 class emitter(object):
     def on(self, key, function):
         self.map[key] = function
@@ -9,7 +11,7 @@ class emitter(object):
         self.mapack[key] = function
 
     def execute(self, key, object):
-
+        logging.warning("execute: %s, %s", key, object)
         if key in self.map:
             function = self.map[key]
             if function is not None:

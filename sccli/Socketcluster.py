@@ -1,69 +1,112 @@
 import json
 from threading import Timer
 import websocket
+from typing import Any, Union
 import logging
-from typing import Any
+
+logging.basicConfig(
+    format='%(asctime)s,%(msecs)d [%(filename)s:%(lineno)d] %(message)s',
+    datefmt='%Y-%m-%d:%H:%M:%S')
 
 import msgpack
 
 from .Emitter import emitter
 from .Parser import parse
 
-sclogger = logging.getLogger(__name__)
-sclogger.addHandler(logging.StreamHandler())
-sclogger.setLevel(logging.WARNING)
-
 
 class BlankDict(dict):
     def __missing__(self, key):
-        return ''
+        return ""
 
 
-def msgpackEncode(obj):
-    return msgpack.packb(obj, use_bin_type=True)
+def msgpackEncode(obj: Any):
+    encoded = msgpack.packb(obj, use_bin_type=True)
+    logging.warning("encoded: %s, %s, %s", type(encoded), [b for b in encoded], encoded)
+    return encoded
 
 
-def msgpackDecode(obj):
-    return msgpack.unpackb(obj, raw=False)
+def msgpackDecode(msg: bytes):
+    decoded = msgpack.unpackb(msg, raw=False)
+    return decoded
 
 
 class Packer:
     def __init__(self, is_enable_codec: bool):
         self.is_enable_codec = is_enable_codec
 
-    def marshal(self, v: Any) -> str:
+    def marshal(self, v: Any) -> bytes:
+        logging.warning("marshal: %s", v)
         if not self.is_enable_codec:
             return json.dumps(v, sort_keys=True)
-        if "authToken" in v["data"]:
-            newV = {"e": [v["event"], v["data"], v["cid"]]}
+
+        if ("cid" in v) and ("data" in v) and ("event" in v):
+            if "authToken" in v["data"]:
+                newV = {"e": [v["event"], v["data"], v["cid"]]}
+                return msgpackEncode(newV)
+
+            if "channel" not in v["data"]:
+                return msgpackEncode(v)
+
+            newV = {}
+            array = []
+            if v["event"] == "#publish":
+                array.append(v["data"]["channel"])
+                if "data" in v["data"]:
+                    array.append(v["data"]["data"])
+                else:
+                    array.append(None)
+                if v["cid"] != 0:
+                    array.append(v["cid"])
+                newV["p"] = array
+            else:
+                array.append(v["event"])
+                array.append(v["data"])
+                if v["cid"] != 0:
+                    array.append(v["cid"])
+                newV["e"] = array
             return msgpackEncode(newV)
 
-        channel = v["data"]["channel"]
-        if not "channel" in v["data"]:
+        elif ("rid" in v) and ("data" in v) and ("error" in v):
+            newV = {"r": [v["rid"], v["error"], v["data"]]}
+            return msgpackEncode(newV)
+
+        else:
             return msgpackEncode(v)
 
-        array = [channel.Channel, channel.Data]
-        if v["cid"] != 0 :
-            array.append(v["cid"])
-
-        newV  = {}
-        if v.Event == "#publish":
-            newV = {"p": array}
-        else:
-            newV = {"e": array}
-
-        result, err = msgpackEncode(newV)
-
-        if "rid" in v["data"]:
-            newV = {"r": [v.Rid, v.Error, v["data"]]}
-            return msgpackEncode(newV)
-
-        return msgpackEncode(v)
-
-    def unmarshal(self, data: str) -> Any:
+    def unmarshal(self, msg: bytes) -> Union[dict, str]:
+        v = {}
         if not self.is_enable_codec:
-            json.loads(data, object_hook=BlankDict)
-        return None
+            v = json.loads(msg, object_hook=BlankDict)
+        else:
+            v = msgpackDecode(msg)
+
+        if type(v) is str:
+            return v
+
+        ret = {}
+        array = []
+        if "r" in v:
+            array = v["r"]
+            if len(array) != 3:
+                return ret
+            ret["rid"] = array[0]
+            ret["error"] = array[1]
+            ret["data"] = array[2]
+            return ret
+        if "p" in v:
+            array = v["p"]
+            ret["event"] = "#publish"
+        elif "e" in v:
+            array = v["e"]
+        else:
+            return ret
+        if len(array) < 2:
+            return ret
+        ret["data"] = {"channel": array[0], "data": array[1]}
+        if len(array) == 3:
+            ret["cid"] = array[2]
+        logging.warning("unmarshal: msg: %s, ret: %s, v: %s", msg, ret, v)
+        return ret
 
 
 class socket(emitter):
@@ -81,28 +124,21 @@ class socket(emitter):
         emitter.__init__(self)
 
     def enablelogger(self, enabled):
-        if (enabled):
-            sclogger.setLevel(logging.DEBUG)
-        else:
-            sclogger.setLevel(logging.WARNING)
-
-    def getlogger(self):
-        return sclogger
+        pass
 
     def emitack(self, event, object, ack):
         emitobject = json.loads('{}')
         emitobject["event"] = event
         emitobject["data"] = object
         emitobject["cid"] = self.getandincrement()
-        self.ws.send(self.packer.marshal(emitobject))
-        sclogger.debug("Emit data is " + self.packer.marshal(emitobject))
+        self.send(self.packer.marshal(emitobject))
         self.acks[self.cnt] = [event, ack]
 
     def emit(self, event, object):
         emitobject = json.loads('{}')
         emitobject["event"] = event
         emitobject["data"] = object
-        self.ws.send(self.packer.marshal(emitobject))
+        self.send(self.packer.marshal(emitobject))
 
     def subscribe(self, channel):
         subscribeobject = json.loads('{}')
@@ -111,11 +147,11 @@ class socket(emitter):
         object["channel"] = channel
         subscribeobject["data"] = object
         subscribeobject["cid"] = self.getandincrement()
-        self.ws.send(self.packer.marshal(subscribeobject))
+        self.send(self.packer.marshal(subscribeobject))
         self.channels.append(channel)
 
     def sub(self, channel):
-        self.ws.send(
+        self.send(
             "{\"event\":\"#subscribe\",\"data\":{\"channel\":\"" + channel + "\"},\"cid\":" + str(
                 self.getandincrement()) + "}")
 
@@ -126,7 +162,7 @@ class socket(emitter):
         object["channel"] = channel
         subscribeobject["data"] = object
         subscribeobject["cid"] = self.getandincrement()
-        self.ws.send(self.packer.marshal(subscribeobject))
+        self.send(self.packer.marshal(subscribeobject))
         self.channels.append(channel)
         self.acks[self.cnt] = [channel, ack]
 
@@ -135,7 +171,7 @@ class socket(emitter):
         subscribeobject["event"] = "#unsubscribe"
         subscribeobject["data"] = channel
         subscribeobject["cid"] = self.getandincrement()
-        self.ws.send(self.packer.marshal(subscribeobject))
+        self.send(self.packer.marshal(subscribeobject))
         self.channels.remove(channel)
 
     def unsubscribeack(self, channel, ack):
@@ -143,7 +179,7 @@ class socket(emitter):
         subscribeobject["event"] = "#unsubscribe"
         subscribeobject["data"] = channel
         subscribeobject["cid"] = self.getandincrement()
-        self.ws.send(self.packer.marshal(subscribeobject))
+        self.send(self.packer.marshal(subscribeobject))
         self.channels.remove(channel)
         self.acks[self.cnt] = [channel, ack]
 
@@ -155,7 +191,7 @@ class socket(emitter):
         object["data"] = data
         publishobject["data"] = object
         publishobject["cid"] = self.getandincrement()
-        self.ws.send(self.packer.marshal(publishobject))
+        self.send(self.packer.marshal(publishobject))
 
     def publishack(self, channel, data, ack):
         publishobject = json.loads('{}')
@@ -165,7 +201,7 @@ class socket(emitter):
         object["data"] = data
         publishobject["data"] = object
         publishobject["cid"] = self.getandincrement()
-        self.ws.send(self.packer.marshal(publishobject))
+        self.send(self.packer.marshal(publishobject))
         self.acks[self.cnt] = [channel, ack]
 
     def getsubscribedchannels(self):
@@ -190,47 +226,63 @@ class socket(emitter):
 
 
     def on_message(self, ws, message):
-        if message == "":
-            self.ws.send("")
-            sclogger.debug("received ping, sending pong back")
-        else:
-            sclogger.debug(message)
-            mainobject = self.packer.unmarshal(message)
+        if message == "":  # ping without codec
+            self.ws.send("")  # received ping, sending pong back
+            return
+
+        mainobject = self.packer.unmarshal(message)
+        logging.warning("on_message mainobject: %s", mainobject)
+        if mainobject == "#1":
+            pong = self.packer.marshal("#2")
+            logging.warning("received ping %s, send %s", mainobject, pong)
+            self.send(pong)
+            return
+
+        dataobject = {}
+        if "data" in mainobject:
             dataobject = mainobject["data"]
+        rid = ""
+        if "rid" in mainobject:
             rid = mainobject["rid"]
+        cid = ""
+        if "cid" in mainobject:
             cid = mainobject["cid"]
+        event = ""
+        if "event" in mainobject:
             event = mainobject["event"]
-            result = parse(dataobject, rid, cid, event)
-            if result == 1:
-                self.subscribechannels()
-                if self.OnAuthentication is not None:
-                    self.id = dataobject["id"]
-                    self.OnAuthentication(self, dataobject["isAuthenticated"])
-            elif result == 2:
-                self.execute(dataobject["channel"], dataobject["data"])
-                sclogger.debug("publish event received for channel :: " + dataobject["channel"])
-            elif result == 3:
-                self.authToken = None
-                sclogger.debug("remove token event received")
-            elif result == 4:
-                sclogger.debug("set token event received")
-                if self.onSetAuthentication is not None:
-                    self.onSetAuthentication(self, dataobject["token"])
-            elif result == 5:
-                sclogger.debug("received data for event :: " + event)
-                if self.haseventack(event):
-                    self.executeack(event, dataobject, self.Ack(cid))
-                else:
-                    self.execute(event, dataobject)
+        msgType = parse(dataobject, rid, cid, event)
+        if msgType == 1:
+            self.subscribechannels()
+            if self.OnAuthentication is not None:
+                self.id = dataobject["id"]
+                self.OnAuthentication(self, dataobject["isAuthenticated"])
+        elif msgType == 2:
+            logging.warning("msgType == 2: %s", dataobject)
+            self.execute(dataobject["channel"], dataobject["data"])
+            # received msg on channel
+        elif msgType == 3:
+            self.authToken = None
+            # remove token event received
+        elif msgType == 4:
+            # set token event received"
+            if self.onSetAuthentication is not None:
+                self.onSetAuthentication(self, dataobject["token"])
+        elif msgType == 5:
+            # received data for event
+            if self.haseventack(event):
+                self.executeack(event, dataobject, self.Ack(cid))
             else:
-                if rid in self.acks:
-                    tuple = self.acks[rid]
-                    if tuple is not None:
-                        sclogger.debug("Ack received for event :: " + tuple[0])
-                        ack = tuple[1]
-                        ack(tuple[0], mainobject["error"], mainobject["data"])
-                    else:
-                        sclogger.warning("Ack function not found for rid :: " + rid)
+                self.execute(event, dataobject)
+        else:
+            if rid in self.acks:
+                tuple = self.acks[rid]
+                if tuple is not None:
+                    # Ack received for event
+                    ack = tuple[1]
+                    ack(tuple[0], mainobject["error"], mainobject["data"])
+                else:
+                    # Ack function not found for rid
+                    pass
 
     def on_error(self, ws, error):
         if self.onConnectError is not None:
@@ -259,7 +311,7 @@ class socket(emitter):
         object["authToken"] = self.authToken
         handshakeobject["data"] = object
         handshakeobject["cid"] = self.getandincrement()
-        self.ws.send(self.packer.marshal(handshakeobject))
+        self.send(self.packer.marshal(handshakeobject))
 
         if self.onConnected is not None:
             self.onConnected(self)
@@ -300,3 +352,6 @@ class socket(emitter):
         self.enablereconnection = False
         self.ws.close()
 
+    def send(self, msg: bytes):
+        if self.ws is not None:
+            self.ws.send(msg, 0x2)

@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -9,12 +10,13 @@ from sccli.Socketcluster import socket
 
 
 # const
-channel0 = "market.bidoffer"
+channel0 = "channel0"
 
 
 def on_connect(sock: socket):
     logging.warning("on_connect got called")
     sock.subscribeack(channel0, on_sub_ack)
+    s.publish(channel0, {"FuckFromPython": "FuckFromPython"})
 
 
 def on_disconnect(sock: socket):
@@ -22,15 +24,15 @@ def on_disconnect(sock: socket):
 
 
 def on_connect_error(sock: socket, err):
-    logging.warning("on_connect_error got called: ", err)
+    logging.warning("on_connect_error got called: %s", err)
 
 
 def on_message(key, obj):
-    logging.warning("got data " + obj + " from key " + key)
+    logging.warning("received key %s, data:%s ", key, obj)
 
 
 def on_sub_ack(channel, error, obj):
-    if error is '':
+    if error is "":
         logging.warning("subscribed successfully to channel " + channel)
 
 
@@ -40,7 +42,4 @@ if __name__ == "__main__":
     s = socket(svrAddr)
     s.setBasicListener(on_connect, on_disconnect, on_connect_error)
     s.onchannel(channel0, on_message)
-
-    s.enablelogger(True)
-
     s.connect()
