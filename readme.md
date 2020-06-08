@@ -18,8 +18,8 @@ Example for publishing and subscribing data in `main_test.py`
 * `venv/bin/activate`  
 * `python -m pip freeze --local > requirements.txt`
 * Packaging tools:  
-````sudo python3 -m pip install --upgrade setuptools wheel twine````  
+````sudo python3 -m pip install --upgrade setuptools wheel twine keyrings.alt````  
 * Create built distribution:  
 ````python setup.py sdist bdist_wheel````  
 * Upload the distribution:  
-````python3 -m twine upload --repository pypi````
+````/usr/bin/python3.7 -m twine upload --repository pypi ./dist/*````
