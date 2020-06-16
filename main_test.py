@@ -16,7 +16,7 @@ channel0 = "channel0"
 def on_connect(sock: socket):
     logging.warning("on_connect got called")
     sock.subscribeack(channel0, on_sub_ack)
-    s.publish(channel0, {"FuckFromPython": "FuckFromPython"})
+    # s.publish(channel0, {"FuckFromPython": "FuckFromPython"})
 
 
 def on_disconnect(sock: socket):
@@ -32,7 +32,7 @@ def on_message(channel, obj):
 
 
 def on_sub_ack(channel, error, obj):
-    if error is "":
+    if error == "":
         logging.warning("subscribed successfully to channel " + channel)
 
 
