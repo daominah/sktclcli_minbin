@@ -8,7 +8,7 @@ with open('requirements.txt') as f:
 
 setuptools.setup(
     name="sktclcli_minbin",  # add your username to ensure uniqueness
-    version="0.1.1",
+    version="0.1.4",
     author="daominah",
     author_email="tung.dao@techx.vn",
     description="A client in Python to connect to socket cluster server",
