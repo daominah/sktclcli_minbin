@@ -5,12 +5,12 @@ Forked from [sacOO7/socketcluster-client-python](https://github.com/sacOO7/socke
 
 ## Changes
 
-* Apply codec [MinBin](https://github.com/SocketCluster/sc-codec-min-bin). I hate this codec.
+* Apply codec [MinBin](https://github.com/SocketCluster/sc-codec-min-bin).
 * Add requirements.txt
 
 ## Install the package
 
-`pip install sktclcli_minbin`
+`pip install sktclcli-minbin`
 
 ## Usage
 
